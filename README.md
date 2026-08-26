@@ -9,7 +9,7 @@ sudo su
 git clone https://github.com/issaattama/CHRVPS
 ```
 ```
-cd ACHR-Ubuntu
+cd CHRVPS
 ```
 ```
 chmod +x install.sh
