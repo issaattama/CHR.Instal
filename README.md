@@ -1,4 +1,4 @@
-# ACHR-Ubuntu
+# CHRVPS
 This is a script to automatically install Mikrotik Chr on Ubuntu versions 20.04, 22.04, and 24.04.
 
 # Usage
@@ -6,7 +6,7 @@ This is a script to automatically install Mikrotik Chr on Ubuntu versions 20.04,
 sudo su
 ```
 ```
-git clone https://github.com/safrinnetwork/ACHR-Ubuntu
+git clone https://github.com/issaattama/CHRVPS
 ```
 ```
 cd ACHR-Ubuntu
