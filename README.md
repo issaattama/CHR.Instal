@@ -6,8 +6,8 @@ Script otomatis untuk mengubah OS VPS Ubuntu (**20.04, 22.04, dan 24.04**) menja
 
 ## Fitur Utama
 - Mendukung Ubuntu 20.04, 22.04, dan 24.04 LTS.
-- Mendukung instalasi **MikroTik v6** (Automated Offset 512).
-- Mendukung instalasi **MikroTik v7** (Automated Offset 33554432).
+- Mendukung instalasi **MikroTik v6** dan **v7**, versi berapa pun.
+- **Offset partisi dideteksi otomatis** dari tabel partisi image (bukan angka tetap) — jadi tetap akurat meski MikroTik mengubah layout partisi di rilis tertentu.
 - Bebas eror format Windows (`\r\n`) saat ditarik menggunakan git.
 - Deteksi IP Statis, Gateway, Interface, dan Disk otomatis.
 - Validasi format versi RouterOS sebelum diunduh.
@@ -33,7 +33,7 @@ Pilih versi (v6/v7) dan ikuti petunjuk. Cek versi resmi di MikroTik CHR Download
 
 ### Langkah 3: Ikuti Instruksi di Layar
 1. Pilih angka `1` untuk RouterOS v7 atau `2` untuk RouterOS v6.
-2. Ketik versi spesifik yang ingin diunduh (Contoh: `7.21.5` atau `6.49.20`).
+2. Ketik versi spesifik yang ingin diunduh (Contoh: `7.21.5` atau `6.49.17`).
 3. Script akan menampilkan disk, interface, IP, dan gateway yang berhasil dideteksi — **periksa dulu apakah sudah sesuai** sebelum melanjutkan.
 4. Ketik `YAKIN` (huruf besar) untuk mengonfirmasi bahwa Anda sadar seluruh isi disk akan terhapus.
 5. Tunggu proses instalasi hingga VPS melakukan *reboot* otomatis dan memutuskan koneksi SSH.
@@ -50,6 +50,35 @@ Pilih versi (v6/v7) dan ikuti petunjuk. Cek versi resmi di MikroTik CHR Download
 5. Klik **Connect** dan Anda akan langsung diminta membuat password baru.
 
 ## Troubleshooting
-- **Mount gagal / offset tidak cocok**: kemungkinan versi RouterOS yang dipilih memakai layout partisi berbeda dari yang diasumsikan script. Cek manual dengan `fdisk -lu chr-<versi>.img` setelah file image berhasil diunduh.
-- **Deteksi disk/IP/gateway gagal**: script akan berhenti sebelum mengunduh apa pun. Periksa manual dengan `lsblk`, `ip route`, dan `ip addr` lalu sesuaikan variabel di script bila perlu.
-- **`dd` gagal di tengah proses**: jangan reboot manual. Disk kemungkinan dalam kondisi tidak konsisten — hubungi provider VPS untuk akses rescue/console.
+
+### Script berhenti di tengah jalan, padahal image sudah ke-download
+Ini kondisi paling umum terjadi (misal gagal di tahap mount/flashing). Kabar baiknya: **selama script berhenti SEBELUM tahap "Flashing ke Harddisk" muncul di layar, VPS Anda masih 100% utuh** — belum ada perubahan apa pun ke disk. Aman untuk diulang dari awal.
+
+**Opsi cepat** (kalau folder `CHR.Instal` masih ada dan install.sh tidak perlu diganti):
+```bash
+cd ~/CHR.Instal
+rm -f chr-*.img routeros.zip     # bersihkan file image/zip yang lama
+./install.sh
+```
+
+**Opsi bersih total** (hapus folder lama & clone ulang dari GitHub — dipakai kalau `install.sh` di GitHub juga baru saja diupdate):
+```bash
+cd ~
+rm -rf CHR.Instal chr-*.img routeros.zip 2>/dev/null
+git clone https://github.com/issaattama/CHR.Instal && cd CHR.Instal && sed -i 's/\r$//' install.sh && chmod +x install.sh && ./install.sh
+```
+
+Script saat ini **selalu mengunduh ulang** image setiap kali dijalankan (belum ada logika skip-jika-sudah-ada), jadi tidak masalah kalau file lama dihapus dulu — hanya makan waktu tambahan untuk download ulang, bukan risiko keamanan. Kalau koneksi VPS Anda lambat dan ingin hemat kuota/waktu, image yang sama (versi & ukuran identik) tidak perlu dihapus — script akan menimpanya otomatis lewat `unzip -o`, jadi boleh langsung `./install.sh` lagi tanpa `rm` asal Anda yakin file lama belum korup (misal terhenti di tengah proses `wget`/`unzip`).
+
+### Mount gagal / offset tidak cocok
+Kemungkinan versi RouterOS yang dipilih memakai layout partisi yang tidak bisa dibaca `sfdisk` (jarang terjadi karena offset sekarang dideteksi otomatis, tapi bisa muncul kalau file image korup akibat download terputus). Cek manual:
+```bash
+fdisk -lu chr-<versi>.img
+```
+Kalau outputnya kosong atau error, file image kemungkinan rusak — hapus dan download ulang (lihat bagian di atas).
+
+### Deteksi disk/IP/gateway gagal
+Script akan berhenti sebelum mengunduh apa pun (aman). Periksa manual dengan `lsblk`, `ip route`, dan `ip addr` lalu sesuaikan variabel di script bila perlu.
+
+### `dd` gagal di tengah proses
+Jangan reboot manual. Disk kemungkinan dalam kondisi tidak konsisten — hubungi provider VPS untuk akses rescue/console.
