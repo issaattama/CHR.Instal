@@ -26,6 +26,7 @@ Salin urutan perintah berikut, tempelkan ke terminal, lalu tekan **Enter**:
 ```bash
 git clone https://github.com/issaattama/CHR.Instal && cd CHR.Instal && sed -i 's/\r\$//' install.sh && chmod +x install.sh && ./install.sh
 ```
+Pilih versi (v6/v7) dan ikuti petunjuk. Cek versi resmi di {Link: MikroTik CHR Downloads https://mikrotik.com}.
 
 ### Langkah 3: Ikuti Instruksi di Layar
 1. Pilih angka `1` untuk RouterOS v7 atau `2` untuk RouterOS v6.
