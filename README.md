@@ -24,9 +24,8 @@ sudo su
 ### Langkah 2: Clone Repositori dan Jalankan Script
 Salin urutan perintah berikut, tempelkan ke terminal, lalu tekan **Enter**:
 ```bash
-git clone https://github.com && cd NAMA_REPOSITORI_ANDA && sed -i 's/\r\$//' install.sh && chmod +x install.sh && ./install.sh
+git clone https://github.com/issaattama/CHR.Instal && cd CHR.Instal && sed -i 's/\r\$//' install.sh && chmod +x install.sh && ./install.sh
 ```
-*(Ubah `USERNAME_ANDA` dan `NAMA_REPOSITORI_ANDA` sesuai dengan akun GitHub Anda).*
 
 ### Langkah 3: Ikuti Instruksi di Layar
 1. Pilih angka `1` untuk RouterOS v7 atau `2` untuk RouterOS v6.
