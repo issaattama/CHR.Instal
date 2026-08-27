@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -u
 
 # Fungsi animasi loading
 show_loading() {
@@ -59,51 +60,90 @@ else
     exit 1
 fi
 
+# Validasi format versi (angka & titik saja) supaya tidak nyasar ke URL aneh
+if ! [[ "$CHR_VERSION" =~ ^[0-9]+(\.[0-9]+)+$ ]]; then
+    echo -e "\e[31mFormat versi tidak valid. Contoh yang benar: 7.21.5\e[0m"
+    exit 1
+fi
+
+# Deteksi disk & interface lebih dulu, supaya user bisa konfirmasi sebelum apa pun diunduh
+DISK=$(lsblk -dn -o NAME,TYPE | awk '$2=="disk"{print $1; exit}')
+INTERFACE=$(ip -o -4 route show to default | awk '{print $5; exit}')
+INTERFACE_IP=$(ip -4 -o addr show "$INTERFACE" 2>/dev/null | awk '{print $4; exit}')
+INTERFACE_GATEWAY=$(ip route show | awk '/default/{print $3; exit}')
+
+if [ -z "$DISK" ] || [ -z "$INTERFACE" ] || [ -z "$INTERFACE_IP" ] || [ -z "$INTERFACE_GATEWAY" ]; then
+    echo -e "\e[31mGagal mendeteksi disk/interface/IP/gateway secara otomatis.\e[0m"
+    echo "DISK=$DISK  INTERFACE=$INTERFACE  IP=$INTERFACE_IP  GATEWAY=$INTERFACE_GATEWAY"
+    echo "Periksa manual sebelum lanjut (script dihentikan demi keamanan)."
+    exit 1
+fi
+
+echo -e "\e[33m--- Konfirmasi sebelum menghapus seluruh isi VPS ---\e[0m"
+echo "Disk target   : /dev/$DISK (SELURUH ISI AKAN DIHAPUS)"
+echo "Interface     : $INTERFACE"
+echo "IP yang akan dipasang ke RouterOS : $INTERFACE_IP"
+echo "Gateway       : $INTERFACE_GATEWAY"
+echo "RouterOS      : v$CHR_VERSION (offset $OFFSET)"
+read -p "Ketik YAKIN (huruf besar) untuk melanjutkan: " CONFIRM
+if [ "$CONFIRM" != "YAKIN" ]; then
+    echo "Dibatalkan oleh user."
+    exit 1
+fi
+
 echo -e "\n\e[34m[2/5] Menyiapkan package dependencies (wget & unzip)...\e[0m"
 {
     apt-get update -y > /dev/null 2>&1
     apt-get install wget unzip -y > /dev/null 2>&1
 } & show_loading
 
-# Membaca konfigurasi jaringan VPS asli
-DISK=$(lsblk | grep "disk" | head -n 1 | cut -d' ' -f1)
-INTERFACE=$(ip -o -4 route show to default | awk '{print $5}')
-INTERFACE_IP=$(ip addr show $INTERFACE | grep global | cut -d' ' -f 6 | head -n 1)
-INTERFACE_GATEWAY=$(ip route show | grep default | awk '{print $3}')
+if ! command -v wget >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+    echo -e "\e[31mGagal memasang wget/unzip. Cek koneksi/apt repo VPS Anda.\e[0m"
+    exit 1
+fi
 
 echo -e "\e[34m[3/5] Mengunduh MikroTik CHR v$CHR_VERSION...\e[0m"
 {
-    wget -qO routeros.zip https://download.mikrotik.com/routeros/$CHR_VERSION/chr-$CHR_VERSION.img.zip && \
-    unzip routeros.zip > /dev/null 2>&1 && \
-    rm -rf routeros.zip
+    wget -qO routeros.zip "https://download.mikrotik.com/routeros/$CHR_VERSION/chr-$CHR_VERSION.img.zip" && \
+    unzip -o routeros.zip > /dev/null 2>&1 && \
+    rm -f routeros.zip
 } & show_loading
 
 if [ ! -f "chr-$CHR_VERSION.img" ]; then
-    echo -e "\e[31mGagal mengunduh file! Pastikan nomor versi benar.\e[0m"
+    echo -e "\e[31mGagal mengunduh/mengekstrak file! Pastikan nomor versi benar dan tersedia di download.mikrotik.com.\e[0m"
     exit 1
 fi
 
 echo -e "\e[34m[4/5] Memasang IP otomatis ke dalam Image (Offset: $OFFSET)...\e[0m"
-{
-    mkdir -p /mnt/mikrotik
-    mount -o loop,offset=$OFFSET chr-$CHR_VERSION.img /mnt/mikrotik > /dev/null 2>&1
-    mkdir -p /mnt/mikrotik/rw
-    
-    # Membuat script autorun IP jaringan
-    echo "/ip address add address=${INTERFACE_IP} interface=[/interface ethernet find where name=ether1]" > /mnt/mikrotik/rw/autorun.scr
-    echo "/ip route add gateway=${INTERFACE_GATEWAY}" >> /mnt/mikrotik/rw/autorun.scr
-    
-    umount /mnt/mikrotik > /dev/null 2>&1
-} & show_loading
+mkdir -p /mnt/mikrotik
+if ! mount -o loop,offset=$OFFSET "chr-$CHR_VERSION.img" /mnt/mikrotik; then
+    echo -e "\e[31mMount gagal pada offset $OFFSET. Kemungkinan layout partisi versi ini berbeda dari yang diasumsikan script.\e[0m"
+    echo "Cek manual dengan: fdisk -lu chr-$CHR_VERSION.img"
+    exit 1
+fi
+
+mkdir -p /mnt/mikrotik/rw
+echo "/ip address add address=${INTERFACE_IP} interface=[/interface ethernet find where name=ether1]" > /mnt/mikrotik/rw/autorun.scr
+echo "/ip route add gateway=${INTERFACE_GATEWAY}" >> /mnt/mikrotik/rw/autorun.scr
+
+sync
+if ! umount /mnt/mikrotik; then
+    echo -e "\e[31mGagal unmount /mnt/mikrotik. Menghentikan proses demi keamanan (autorun.scr mungkin belum ter-flush).\e[0m"
+    exit 1
+fi
 
 echo -e "\e[34m[5/5] Melakukan Flashing ke Harddisk (/dev/$DISK) & Reboot...\e[0m"
 sleep 2
-{
-    echo u > /proc/sysrq-trigger
-    dd if=chr-$CHR_VERSION.img of=/dev/${DISK} bs=4M oflag=sync > /dev/null 2>&1
-} & show_loading
+echo u > /proc/sysrq-trigger
+sync
 
-echo -e "\e[32mInstalasi Selesai! VPS akan otomatis restart dalam 5 detik.\e[0m"
-echo -e "\e[33mSilakan login menggunakan Winbox setelah VPS menyala kembali.\e[0m"
-sleep 5
-echo b > /proc/sysrq-trigger
+if dd if="chr-$CHR_VERSION.img" of="/dev/${DISK}" bs=4M oflag=sync status=none; then
+    echo -e "\e[32mFlashing berhasil. VPS akan otomatis restart dalam 5 detik.\e[0m"
+    echo -e "\e[33mSilakan login menggunakan Winbox setelah VPS menyala kembali (IP: ${INTERFACE_IP%/*}).\e[0m"
+    sleep 5
+    echo b > /proc/sysrq-trigger
+else
+    echo -e "\e[31mdd GAGAL di tengah proses! Disk kemungkinan dalam kondisi tidak konsisten.\e[0m"
+    echo -e "\e[31mJANGAN reboot manual — hubungi provider VPS untuk akses rescue/console sebelum bertindak lebih lanjut.\e[0m"
+    exit 1
+fi
