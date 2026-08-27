@@ -33,7 +33,7 @@ Pilih versi (v6/v7) dan ikuti petunjuk. Cek versi resmi di MikroTik CHR Download
 
 ### Langkah 3: Ikuti Instruksi di Layar
 1. Pilih angka `1` untuk RouterOS v7 atau `2` untuk RouterOS v6.
-2. Ketik versi spesifik yang ingin diunduh (Contoh: `7.21.5` atau `6.49.17`).
+2. Ketik versi spesifik yang ingin diunduh (Contoh: `7.21.5` atau `6.49.20`).
 3. Script akan menampilkan disk, interface, IP, dan gateway yang berhasil dideteksi — **periksa dulu apakah sudah sesuai** sebelum melanjutkan.
 4. Ketik `YAKIN` (huruf besar) untuk mengonfirmasi bahwa Anda sadar seluruh isi disk akan terhapus.
 5. Tunggu proses instalasi hingga VPS melakukan *reboot* otomatis dan memutuskan koneksi SSH.
