@@ -51,14 +51,15 @@ read -p "Masukkan pilihan Anda (1 atau 2): " VERSION_CHOICE
 
 if [ "$VERSION_CHOICE" == "1" ]; then
     read -p "Masukkan nomor versi v7 yang diinginkan (Contoh: 7.21.5): " CHR_VERSION
-    OFFSET=33554432
 elif [ "$VERSION_CHOICE" == "2" ]; then
     read -p "Masukkan nomor versi v6 yang diinginkan (Contoh: 6.49.20): " CHR_VERSION
-    OFFSET=512
 else
     echo -e "\e[31mPilihan tidak valid. Proses dibatalkan.\e[0m"
     exit 1
 fi
+# Catatan: offset partisi TIDAK di-hardcode lagi — dideteksi otomatis dari
+# tabel partisi image setelah berhasil diunduh (lihat langkah 4/5), karena
+# offset berbeda-beda antar rilis RouterOS dan nilai tetap sering meleset.
 
 # Validasi format versi (angka & titik saja) supaya tidak nyasar ke URL aneh
 if ! [[ "$CHR_VERSION" =~ ^[0-9]+(\.[0-9]+)+$ ]]; then
@@ -84,7 +85,7 @@ echo "Disk target   : /dev/$DISK (SELURUH ISI AKAN DIHAPUS)"
 echo "Interface     : $INTERFACE"
 echo "IP yang akan dipasang ke RouterOS : $INTERFACE_IP"
 echo "Gateway       : $INTERFACE_GATEWAY"
-echo "RouterOS      : v$CHR_VERSION (offset $OFFSET)"
+echo "RouterOS      : v$CHR_VERSION (offset partisi akan dideteksi otomatis setelah download)"
 read -p "Ketik YAKIN (huruf besar) untuk melanjutkan: " CONFIRM
 if [ "$CONFIRM" != "YAKIN" ]; then
     echo "Dibatalkan oleh user."
@@ -114,13 +115,39 @@ if [ ! -f "chr-$CHR_VERSION.img" ]; then
     exit 1
 fi
 
-echo -e "\e[34m[4/5] Memasang IP otomatis ke dalam Image (Offset: $OFFSET)...\e[0m"
-mkdir -p /mnt/mikrotik
-if ! mount -o loop,offset=$OFFSET "chr-$CHR_VERSION.img" /mnt/mikrotik; then
-    echo -e "\e[31mMount gagal pada offset $OFFSET. Kemungkinan layout partisi versi ini berbeda dari yang diasumsikan script.\e[0m"
-    echo "Cek manual dengan: fdisk -lu chr-$CHR_VERSION.img"
+echo -e "\e[34m[4/5] Mendeteksi offset partisi & memasang IP otomatis ke dalam Image...\e[0m"
+
+IMG_FILE="chr-$CHR_VERSION.img"
+
+# Baca tabel partisi image (bukan angka tetap) — ambil semua nilai "start"
+mapfile -t PART_STARTS < <(sfdisk -d "$IMG_FILE" 2>/dev/null | \
+    awk -F'start=|,' -v img="$IMG_FILE" '$0 ~ "^"img"[0-9]+[ \t]*:"{gsub(/[ \t]/,"",$2); print $2}')
+
+if [ "${#PART_STARTS[@]}" -eq 0 ]; then
+    echo -e "\e[31mTidak bisa membaca tabel partisi dari $IMG_FILE. Instalasi dibatalkan.\e[0m"
+    echo "Cek manual dengan: fdisk -lu $IMG_FILE"
     exit 1
 fi
+
+mkdir -p /mnt/mikrotik
+OFFSET=""
+# Coba mount mulai dari partisi TERAKHIR (biasanya partisi data/utama RouterOS)
+# mundur ke partisi sebelumnya kalau gagal, sebagai fallback.
+for (( i=${#PART_STARTS[@]}-1; i>=0; i-- )); do
+    TRY_OFFSET=$(( ${PART_STARTS[$i]} * 512 ))
+    if mount -o loop,offset=$TRY_OFFSET "$IMG_FILE" /mnt/mikrotik 2>/dev/null; then
+        OFFSET=$TRY_OFFSET
+        break
+    fi
+done
+
+if [ -z "$OFFSET" ]; then
+    echo -e "\e[31mMount gagal di semua partisi yang terdeteksi ({${PART_STARTS[*]}} sektor). \e[0m"
+    echo "Cek manual dengan: fdisk -lu $IMG_FILE"
+    exit 1
+fi
+
+echo -e "\e[32mBerhasil mount pada offset $OFFSET bytes.\e[0m"
 
 mkdir -p /mnt/mikrotik/rw
 echo "/ip address add address=${INTERFACE_IP} interface=[/interface ethernet find where name=ether1]" > /mnt/mikrotik/rw/autorun.scr
@@ -137,7 +164,7 @@ sleep 2
 echo u > /proc/sysrq-trigger
 sync
 
-if dd if="chr-$CHR_VERSION.img" of="/dev/${DISK}" bs=4M oflag=sync status=none; then
+if dd if="$IMG_FILE" of="/dev/${DISK}" bs=4M oflag=sync status=none; then
     echo -e "\e[32mFlashing berhasil. VPS akan otomatis restart dalam 5 detik.\e[0m"
     echo -e "\e[33mSilakan login menggunakan Winbox setelah VPS menyala kembali (IP: ${INTERFACE_IP%/*}).\e[0m"
     sleep 5
