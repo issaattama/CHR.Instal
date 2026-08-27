@@ -27,7 +27,7 @@ check_root() {
 # Tampilkan spesifikasi VPS
 show_system_details() {
     echo -e "\e[34m[1/5] Memeriksa spesifikasi VPS...\e[0m"
-    IP=$(curl -s http://amazonaws.com)
+    IP=$(curl -s http://checkip.amazonaws.com)
     RAM=$(free -m | awk '/Mem:/ { print $2 }')
     CPU=$(lscpu | grep 'Model name' | cut -d: -f2 | xargs)
     STORAGE=$(df -h | awk '$NF=="/"{printf "%s", $2}')
@@ -44,8 +44,8 @@ show_system_details
 
 # Meminta input versi dari pengguna
 echo -e "\e[34mPilih Versi MikroTik RouterOS yang ingin di-install:\e[0m"
-echo "1) MikroTik v7 (Rekomendasi: 7.21.5 atau v7 terbaru)"
-echo "2) MikroTik v6 (Rekomendasi: 6.49.20 atau v6 lama)"
+echo "1) MikroTik v7 (Rekomendasi: 7.21.5 atau v7 LongTerm terbaru)"
+echo "2) MikroTik v6 (Rekomendasi: 6.49.20 atau v6 LongTerm terbaru)"
 read -p "Masukkan pilihan Anda (1 atau 2): " VERSION_CHOICE
 
 if [ "$VERSION_CHOICE" == "1" ]; then
@@ -73,7 +73,7 @@ INTERFACE_GATEWAY=$(ip route show | grep default | awk '{print $3}')
 
 echo -e "\e[34m[3/5] Mengunduh MikroTik CHR v$CHR_VERSION...\e[0m"
 {
-    wget -qO routeros.zip https://mikrotik.com && \
+    wget -qO routeros.zip https://download.mikrotik.com/routeros/$CHR_VERSION/chr-$CHR_VERSION.img.zip && \
     unzip routeros.zip > /dev/null 2>&1 && \
     rm -rf routeros.zip
 } & show_loading
