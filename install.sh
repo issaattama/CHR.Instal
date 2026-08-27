@@ -45,14 +45,14 @@ show_system_details
 # Meminta input versi dari pengguna
 echo -e "\e[34mPilih Versi MikroTik RouterOS yang ingin di-install:\e[0m"
 echo "1) MikroTik v7 (Rekomendasi: 7.21.5 atau v7 terbaru)"
-echo "2) MikroTik v6 (Rekomendasi: 6.49.17 atau v6 kuno)"
+echo "2) MikroTik v6 (Rekomendasi: 6.49.20 atau v6 lama)"
 read -p "Masukkan pilihan Anda (1 atau 2): " VERSION_CHOICE
 
 if [ "$VERSION_CHOICE" == "1" ]; then
     read -p "Masukkan nomor versi v7 yang diinginkan (Contoh: 7.21.5): " CHR_VERSION
     OFFSET=33554432
 elif [ "$VERSION_CHOICE" == "2" ]; then
-    read -p "Masukkan nomor versi v6 yang diinginkan (Contoh: 6.49.17): " CHR_VERSION
+    read -p "Masukkan nomor versi v6 yang diinginkan (Contoh: 6.49.20): " CHR_VERSION
     OFFSET=512
 else
     echo -e "\e[31mPilihan tidak valid. Proses dibatalkan.\e[0m"
